@@ -17,14 +17,16 @@ use function Amp\call;
  * @throws \Throwable Promise failure reason.
  */
 function await($promise) {
-    if (!$promise instanceof Promise) {
+    while (!$promise instanceof Promise) {
         try {
             if (\is_array($promise)) {
-                return Promise\all($promise);
+                $promise = Promise\all($promise);
+                break;
             }
 
             if ($promise instanceof ReactPromise) {
-                return Promise\adapt($promise);
+                $promise = Promise\adapt($promise);
+                break;
             }
 
             // No match, continue to throwing below.

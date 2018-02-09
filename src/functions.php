@@ -66,16 +66,19 @@ function execute(\Closure $closure, ...$args): Promise {
 
         $yielded = $fiber->resume(...$args);
 
-        while ($fiber->status() !== \Fiber::STATUS_FINISHED) {
+        while ($fiber->status() === \Fiber::STATUS_SUSPENDED) {
             if (!$yielded instanceof Internal\AwaitedPromise) {
                 throw new InvalidAwaitError($yielded, "Must use Amp\GreenThread\await() to pause a green thread");
             }
 
             try {
-                $yielded = $fiber->resume(yield $yielded);
+                $result = yield $yielded;
             } catch (\Throwable $exception) {
                 $yielded = $fiber->resume(new Internal\Failed($exception));
+                continue;
             }
+
+            $yielded = $fiber->resume($result);
         }
 
         return $yielded;

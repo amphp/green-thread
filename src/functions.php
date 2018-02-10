@@ -6,8 +6,7 @@ use Amp\Promise;
 use function Amp\call;
 
 /**
- * This function must be used within the Closure passed to Amp\GreenThread\execute() to pause the green thread.
- * Using \Fiber::yield() directly will throw an exception within the green thread.
+ * Alias of \Fiber::yield().
  *
  * @param \Amp\Promise|\React\Promise\PromiseInterface|array $promise
  *
@@ -16,7 +15,7 @@ use function Amp\call;
  * @throws \Throwable Promise failure reason.
  */
 function await($promise) {
-    return \Fiber::yield(new Internal\Awaited($promise));
+    return \Fiber::yield($promise);
 }
 
 /**
@@ -34,10 +33,6 @@ function execute(\Closure $closure, ...$args): Promise {
         $yielded = $fiber->resume(...$args);
 
         while ($fiber->status() === \Fiber::STATUS_SUSPENDED) {
-            if (!$yielded instanceof Internal\Awaited) {
-                throw new InvalidAwaitError($yielded, "Must use Amp\GreenThread\await() to pause a green thread");
-            }
-
             try {
                 $result = yield $yielded;
             } catch (\Throwable $exception) {

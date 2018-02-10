@@ -3,7 +3,6 @@
 namespace Amp\GreenThread;
 
 use Amp\Promise;
-use React\Promise\PromiseInterface as ReactPromise;
 use function Amp\call;
 
 /**
@@ -17,41 +16,7 @@ use function Amp\call;
  * @throws \Throwable Promise failure reason.
  */
 function await($promise) {
-    while (!$promise instanceof Promise) {
-        try {
-            if (\is_array($promise)) {
-                $promise = Promise\all($promise);
-                break;
-            }
-
-            if ($promise instanceof ReactPromise) {
-                $promise = Promise\adapt($promise);
-                break;
-            }
-
-            // No match, continue to throwing below.
-        } catch (\Throwable $exception) {
-            // Conversion to promise failed, fall-through to throwing below.
-        }
-
-        throw new InvalidAwaitError(
-            $promise,
-            \sprintf(
-                "Unexpected value awaited; Expected an instance of %s or %s or an array of such instances",
-                Promise::class,
-                ReactPromise::class
-            ),
-            $exception ?? null
-        );
-    }
-
-    $value = \Fiber::yield(new Internal\AwaitedPromise($promise));
-
-    if ($value instanceof Internal\Failed) {
-        $value->throw();
-    }
-
-    return $value;
+    return \Fiber::yield(new Internal\Awaited($promise));
 }
 
 /**
@@ -69,14 +34,14 @@ function execute(\Closure $closure, ...$args): Promise {
         $yielded = $fiber->resume(...$args);
 
         while ($fiber->status() === \Fiber::STATUS_SUSPENDED) {
-            if (!$yielded instanceof Internal\AwaitedPromise) {
+            if (!$yielded instanceof Internal\Awaited) {
                 throw new InvalidAwaitError($yielded, "Must use Amp\GreenThread\await() to pause a green thread");
             }
 
             try {
                 $result = yield $yielded;
             } catch (\Throwable $exception) {
-                $yielded = $fiber->resume(new Internal\Failed($exception));
+                $yielded = $fiber->throw($exception);
                 continue;
             }
 

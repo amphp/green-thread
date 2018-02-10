@@ -19,16 +19,16 @@ function await($promise) {
 }
 
 /**
- * Creates a green thread using the given closure and argument list.
+ * Creates a green thread using the given callable and argument list.
  *
- * @param \Closure $closure
+ * @param callable $fiber
  * @param mixed ...$args
  *
  * @return \Amp\Promise
  */
-function execute(\Closure $closure, ...$args): Promise {
-    return call(function () use ($closure, $args) {
-        $fiber = new \Fiber($closure);
+function execute(callable $fiber, ...$args): Promise {
+    return call(function () use ($fiber, $args) {
+        $fiber = new \Fiber($fiber);
 
         $yielded = $fiber->resume(...$args);
 

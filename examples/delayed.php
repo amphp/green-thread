@@ -8,7 +8,8 @@ use function Amp\GreenThread\await;
 use function Amp\GreenThread\execute;
 
 Loop::run(function () {
-    $result = yield execute(function () {
+    // Note that the closure declares int as a return type, not Promise or Generator.
+    $result = yield execute(function (): int {
         return await(new Delayed(1000, 42));
     });
 

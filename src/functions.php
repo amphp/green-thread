@@ -21,14 +21,14 @@ function await($promise) {
 /**
  * Creates a green thread using the given callable and argument list.
  *
- * @param callable $fiber
+ * @param callable $callback
  * @param mixed ...$args
  *
  * @return \Amp\Promise
  */
-function execute(callable $fiber, ...$args): Promise {
-    return call(function () use ($fiber, $args) {
-        $fiber = new \Fiber($fiber);
+function execute(callable $callback, ...$args): Promise {
+    return call(function () use ($callback, $args) {
+        $fiber = new \Fiber($callback);
 
         $yielded = $fiber->resume(...$args);
 
@@ -45,4 +45,16 @@ function execute(callable $fiber, ...$args): Promise {
 
         return $yielded;
     });
+}
+
+/**
+ * @param callable $callback Green thread to create each time the function returned is invoked.
+ *
+ * @return callable Creates a new green thread each time the returned function is invoked. The arguments given to
+ *    the returned function are passed through to the callable.
+ */
+function async(callable $callback): callable {
+    return function (...$args) use ($callback): Promise {
+        return execute($callback, ...$args);
+    };
 }

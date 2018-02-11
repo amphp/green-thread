@@ -23,6 +23,7 @@
     },
     "require-dev": {
         "amphp/phpunit-util": "^1",
+        "react/promise": "^2",
         "friendsofphp/php-cs-fixer": "^2.3",
         "phpunit/phpunit": "^6.0.9"
     },

@@ -64,7 +64,7 @@ function async(callable $callback, ...$args): Promise {
         $awaited = $fiber->resume(...$args);
 
         if ($fiber->status() !== \Fiber::STATUS_SUSPENDED) {
-            return new Success($awaited);
+            return $awaited instanceof Promise ? $awaited : new Success($awaited);
         }
 
         if (!$awaited instanceof Promise) {

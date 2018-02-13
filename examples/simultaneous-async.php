@@ -5,15 +5,15 @@ require dirname(__DIR__) . "/vendor/autoload.php";
 use Amp\Delayed;
 use Amp\Loop;
 use function Amp\GreenThread\async;
-use function Amp\GreenThread\asyncify;
 use function Amp\GreenThread\await;
+use function Amp\GreenThread\coroutine;
 
 // Note that the closure declares int as a return type, not Promise or Generator, but executes like a coroutine.
 $callback = function (int $id): int {
     return await(new Delayed(1000, $id)); // Await promise resolution.
 };
 
-Loop::run(asyncify(function () use ($callback): void {
+Loop::run(coroutine(function () use ($callback): void {
     // Invoking $callback returns an int, but is executed asynchronously.
     $result = $callback(1); // Call a subroutine within this green thread.
     var_dump($result); // Executed after 1 second.

@@ -135,8 +135,54 @@ function async(callable $callback, ...$args): Promise {
  * @return callable Creates a new green thread each time the returned function is invoked. The arguments given to
  *    the returned function are passed through to the callable.
  */
-function asyncify(callable $callback): callable {
+function coroutine(callable $callback): callable {
     return function (...$args) use ($callback): Promise {
         return async($callback, ...$args);
     };
+}
+
+/**
+ * Returns a new function that wraps $callback in a promise/coroutine-aware function that automatically runs
+ * Generators as coroutines. The returned function always returns void when invoked. Errors are forwarded to the
+ * loop's error handler using `Amp\Promise\rethrow()`.
+ *
+ * Use this function to create a coroutine-aware callable for a non-promise-aware callback caller.
+ *
+ * @param callable(...$args): \Generator|\Amp\Promise|mixed $callback
+ *
+ * @return callable(...$args): void
+ *
+ * @see coroutine()
+ */
+function asyncCoroutine(callable $callback): callable {
+    return function (...$args) use ($callback) {
+        Promise\rethrow(async($callback, ...$args));
+    };
+}
+
+/**
+ * Execute a generator yielding promises using a green thread. (Re-implements Amp's Coroutine class, could be
+ * included to ease transition to green threads).
+ *
+ * @param \Generator $generator
+ *
+ * @return \Amp\Promise
+ */
+function execute(\Generator $generator): Promise {
+    return async(function () use ($generator) {
+        $yielded = $generator->current();
+
+        while ($generator->valid()) {
+            try {
+                $value = await($yielded);
+            } catch (\Throwable $exception) {
+                $yielded = $generator->throw($exception);
+                continue;
+            }
+
+            $yielded = $generator->send($value);
+        }
+
+        return $generator->getReturn();
+    });
 }

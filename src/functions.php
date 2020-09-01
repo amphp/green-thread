@@ -11,13 +11,16 @@ use React\Promise\PromiseInterface as ReactPromise;
 /**
  * Await a promise within an async function created by Amp\GreenThread\async().
  *
- * @param \Amp\Promise|\React\Promise\PromiseInterface|array $promise
+ * @template TValue
+ *
+ * @param Promise<TValue>|ReactPromise|array<Promise|ReactPromise> $promise
  *
  * @return mixed Promise resolution value.
  *
- * @throws \Throwable Promise failure reason.
+ * @psalm-return TValue
  */
-function await($promise) {
+function await($promise)
+{
     while (!$promise instanceof Promise) {
         try {
             if (\is_array($promise)) {
@@ -25,6 +28,7 @@ function await($promise) {
                 break;
             }
 
+            /** @psalm-suppress RedundantConditionGivenDocblockType */
             if ($promise instanceof ReactPromise) {
                 $promise = Promise\adapt($promise);
                 break;
@@ -46,18 +50,21 @@ function await($promise) {
         );
     }
 
-    return \Fiber::yield($promise);
+    return \Fiber::suspend(new Internal\Suspension($promise));
 }
 
 /**
  * Creates a green thread using the given callable and argument list.
  *
- * @param callable $callback
+ * @template TValue
+ *
+ * @param callable(mixed ...$args):TValue $callback
  * @param mixed ...$args
  *
- * @return \Amp\Promise
+ * @return Promise<TValue>
  */
-function async(callable $callback, ...$args): Promise {
+function async(callable $callback, ...$args): Promise
+{
     try {
         $fiber = new \Fiber($callback);
 
@@ -67,13 +74,14 @@ function async(callable $callback, ...$args): Promise {
             return $awaited instanceof Promise ? $awaited : new Success($awaited);
         }
 
-        if (!$awaited instanceof Promise) {
+        if (!$awaited instanceof Internal\Suspension) {
             return new Failure(new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises"));
         }
 
         $deferred = new Deferred;
 
-        $onResolve = function ($exception, $value) use (&$onResolve, $fiber, $deferred) {
+        /** @psalm-suppress MissingClosureParamType */
+        $onResolve = function (?\Throwable $exception, $value) use (&$onResolve, $fiber, $deferred): void {
             static $thrown, $result, $immediate = true;
 
             $thrown = $exception;
@@ -100,12 +108,12 @@ function async(callable $callback, ...$args): Promise {
                         return;
                     }
 
-                    if (!$awaited instanceof Promise) {
+                    if (!$awaited instanceof Internal\Suspension) {
                         throw new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises");
                     }
 
                     $immediate = false;
-                    $awaited->onResolve($onResolve);
+                    $awaited->promise()->onResolve($onResolve);
                 } while ($immediate);
 
                 $immediate = true;
@@ -118,7 +126,7 @@ function async(callable $callback, ...$args): Promise {
             }
         };
 
-        $awaited->onResolve($onResolve);
+        $awaited->promise()->onResolve($onResolve);
     } catch (\Throwable $exception) {
         return new Failure($exception);
     }
@@ -127,62 +135,37 @@ function async(callable $callback, ...$args): Promise {
 }
 
 /**
- * Returns a callable that when invoked creates a new green thread using the given call able Amp\GreenThread\async(),
+ * Returns a callable that when invoked creates a new green thread using the given callable using {@see async()},
  * passing any arguments to the function as the argument list to async() and returning promise created by async().
  *
  * @param callable $callback Green thread to create each time the function returned is invoked.
  *
- * @return callable Creates a new green thread each time the returned function is invoked. The arguments given to
+ * @return callable(mixed ...$args):Promise Creates a new green thread each time the returned function is invoked. The arguments given to
  *    the returned function are passed through to the callable.
  */
-function coroutine(callable $callback): callable {
+function coroutine(callable $callback): callable
+{
     return function (...$args) use ($callback): Promise {
         return async($callback, ...$args);
     };
 }
 
 /**
- * Returns a new function that wraps $callback in a promise/coroutine-aware function that automatically runs
- * Generators as coroutines. The returned function always returns void when invoked. Errors are forwarded to the
- * loop's error handler using `Amp\Promise\rethrow()`.
+ * Returns a callable that when invoked creates a new green thread using the given callable using {@see async()} similar
+ * to {@see coroutine()}, however unlike coroutine(), the promise is not returned, rather {@see Promise\rethrow()} is
+ * called, forwarding any unhandled exceptions to the loop exception handler.
  *
  * Use this function to create a coroutine-aware callable for a non-promise-aware callback caller.
  *
- * @param callable(...$args): \Generator|\Amp\Promise|mixed $callback
+ * @param callable(mixed ...$args):mixed $callback
  *
- * @return callable(...$args): void
+ * @return callable(mixed ...$args):void
  *
  * @see coroutine()
  */
-function asyncCoroutine(callable $callback): callable {
+function asyncCoroutine(callable $callback): callable
+{
     return function (...$args) use ($callback) {
         Promise\rethrow(async($callback, ...$args));
     };
-}
-
-/**
- * Execute a generator yielding promises using a green thread. (Re-implements Amp's Coroutine class, could be
- * included to ease transition to green threads).
- *
- * @param \Generator $generator
- *
- * @return \Amp\Promise
- */
-function execute(\Generator $generator): Promise {
-    return async(function () use ($generator) {
-        $yielded = $generator->current();
-
-        while ($generator->valid()) {
-            try {
-                $value = await($yielded);
-            } catch (\Throwable $exception) {
-                $yielded = $generator->throw($exception);
-                continue;
-            }
-
-            $yielded = $generator->send($value);
-        }
-
-        return $generator->getReturn();
-    });
 }

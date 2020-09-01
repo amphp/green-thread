@@ -1,7 +1,7 @@
 {
     "name": "amphp/green-thread",
-    "homepage": "http://amphp.org/amp",
-    "description": "Green thread implementation based on the PHP fiber extension",
+    "homepage": "http://amphp.org",
+    "description": "Green thread implementation based on ext-fiber extension",
     "keywords": [
         "async",
         "asynchronous",
@@ -18,14 +18,16 @@
         }
     ],
     "require": {
+        "php": ">=7.1",
         "ext-fiber": "*",
-        "amphp/amp": "^2"
+        "amphp/amp": "^2.5"
     },
     "require-dev": {
         "amphp/phpunit-util": "^1",
         "react/promise": "^2",
-        "friendsofphp/php-cs-fixer": "^2.3",
-        "phpunit/phpunit": "^6.0.9"
+        "amphp/php-cs-fixer-config": "dev-master",
+        "phpunit/phpunit": "^9",
+        "vimeo/psalm": "^3.11@dev"
     },
     "autoload": {
         "psr-4": {
@@ -43,10 +45,5 @@
     "support": {
         "issues": "https://github.com/amphp/green-thread/issues",
         "irc": "irc://irc.freenode.org/amphp"
-    },
-    "config": {
-        "platform": {
-            "php": "7.0.0"
-        }
     }
 }

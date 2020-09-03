@@ -3,9 +3,8 @@
 namespace Amp\GreenThread;
 
 use Amp\Deferred;
-use Amp\Failure;
+use Amp\Loop;
 use Amp\Promise;
-use Amp\Success;
 use React\Promise\PromiseInterface as ReactPromise;
 
 /**
@@ -13,11 +12,13 @@ use React\Promise\PromiseInterface as ReactPromise;
  *
  * @template TValue
  *
- * @param Promise<TValue>|ReactPromise|array<Promise|ReactPromise> $promise
+ * @param Promise|ReactPromise|array<Promise|ReactPromise> $promise
+ *
+ * @psalm-param Promise<TValue>|ReactPromise|array<Promise<TValue>|ReactPromise> $promise
  *
  * @return mixed Promise resolution value.
  *
- * @psalm-return TValue
+ * @psalm-return TValue|array<TValue>
  */
 function await($promise)
 {
@@ -61,24 +62,27 @@ function await($promise)
  * @param callable(mixed ...$args):TValue $callback
  * @param mixed ...$args
  *
- * @return Promise<TValue>
+ * @return Promise
+ *
+ * @psalm-return Promise<TValue>
  */
 function async(callable $callback, ...$args): Promise
 {
+    $deferred = new Deferred;
+
     try {
         $fiber = new \Fiber($callback);
 
         $awaited = $fiber->start(...$args);
 
-        if ($fiber->status() !== \Fiber::STATUS_SUSPENDED) {
-            return $awaited instanceof Promise ? $awaited : new Success($awaited);
-        }
-
         if (!$awaited instanceof Internal\Suspension) {
-            return new Failure(new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises"));
-        }
+            if ($fiber->getStatus() !== \Fiber::STATUS_SUSPENDED) {
+                $deferred->resolve($fiber->getReturn());
+                return $deferred->promise();
+            }
 
-        $deferred = new Deferred;
+            throw new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises");
+        }
 
         /** @psalm-suppress MissingClosureParamType */
         $onResolve = function (?\Throwable $exception, $value) use (&$onResolve, $fiber, $deferred): void {
@@ -93,42 +97,48 @@ function async(callable $callback, ...$args): Promise
             }
 
             try {
-                do {
-                    if ($thrown) {
-                        // Throw exception at last await.
-                        $awaited = $fiber->throw($thrown);
-                    } else {
-                        // Send the new value and execute to next await.
-                        $awaited = $fiber->resume($result);
-                    }
+                try {
+                    do {
+                        if ($thrown) {
+                            // Throw exception at last await.
+                            $awaited = $fiber->throw($thrown);
+                        } else {
+                            // Send the new value and execute to next await.
+                            $awaited = $fiber->resume($result);
+                        }
 
-                    if ($fiber->status() !== \Fiber::STATUS_SUSPENDED) {
-                        $deferred->resolve($awaited);
-                        $onResolve = null;
-                        return;
-                    }
+                        if (!$awaited instanceof Internal\Suspension) {
+                            if ($fiber->getStatus() !== \Fiber::STATUS_SUSPENDED) {
+                                $onResolve = null;
+                                $deferred->resolve($fiber->getReturn());
+                                return;
+                            }
 
-                    if (!$awaited instanceof Internal\Suspension) {
-                        throw new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises");
-                    }
+                            throw new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises");
+                        }
 
-                    $immediate = false;
-                    $awaited->promise()->onResolve($onResolve);
-                } while ($immediate);
+                        $immediate = false;
+                        $awaited->promise()->onResolve($onResolve);
+                    } while ($immediate);
 
-                $immediate = true;
+                    $immediate = true;
+                } catch (\Throwable $exception) {
+                    $deferred->fail($exception);
+                    $onResolve = null;
+                } finally {
+                    $thrown = null;
+                    $result = null;
+                }
             } catch (\Throwable $exception) {
-                $deferred->fail($exception);
-                $onResolve = null;
-            } finally {
-                $thrown = null;
-                $result = null;
+                Loop::defer(static function () use ($exception) {
+                    throw $exception;
+                });
             }
         };
 
         $awaited->promise()->onResolve($onResolve);
     } catch (\Throwable $exception) {
-        return new Failure($exception);
+        $deferred->fail($exception);
     }
 
     return $deferred->promise();

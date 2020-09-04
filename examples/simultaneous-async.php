@@ -6,14 +6,14 @@ use Amp\Delayed;
 use Amp\Loop;
 use function Amp\GreenThread\async;
 use function Amp\GreenThread\await;
-use function Amp\GreenThread\coroutine;
+use function Amp\GreenThread\continuation;
 
 // Note that the closure declares int as a return type, not Promise or Generator, but executes like a coroutine.
 $callback = function (int $id): int {
     return await(new Delayed(1000, $id)); // Await promise resolution.
 };
 
-Loop::run(coroutine(function () use ($callback): void {
+Loop::run(continuation(function () use ($callback): void {
     $timer = Loop::repeat(100, function () {
         echo ".", PHP_EOL; // This repeat timer is to show the loop is not being blocked.
     });

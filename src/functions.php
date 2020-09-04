@@ -153,7 +153,7 @@ function async(callable $callback, ...$args): Promise
  * @return callable(mixed ...$args):Promise Creates a new green thread each time the returned function is invoked. The arguments given to
  *    the returned function are passed through to the callable.
  */
-function coroutine(callable $callback): callable
+function continuation(callable $callback): callable
 {
     return function (...$args) use ($callback): Promise {
         return async($callback, ...$args);
@@ -173,9 +173,9 @@ function coroutine(callable $callback): callable
  *
  * @see coroutine()
  */
-function asyncCoroutine(callable $callback): callable
+function asyncContinuation(callable $callback): callable
 {
-    return function (...$args) use ($callback) {
+    return function (...$args) use ($callback): void {
         Promise\rethrow(async($callback, ...$args));
     };
 }

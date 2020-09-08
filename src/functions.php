@@ -67,7 +67,46 @@ function await($promise)
         );
     }
 
-    return \Fiber::suspend(new Internal\Suspension($promise));
+    $fiber = \Fiber::getCurrent();
+
+    if ($fiber === null) {
+        throw new \Error('Cannot await outside a green thread; create a green thread using execute() or async() first');
+    }
+
+    $resolved = false;
+    $error = null;
+    $value = null;
+
+    $promise->onResolve(function (?\Throwable $e, $v) use (&$resolved, &$error, &$value, $fiber): void {
+        $resolved = true;
+        $error = $e;
+        $value = $v;
+
+        if ($fiber->getStatus() == \Fiber::STATUS_SUSPENDED) {
+            $fiber->resume();
+        }
+    });
+
+    if (!$resolved) {
+        try {
+            \Fiber::suspend();
+        } catch (\Throwable $e) {
+            // An exception is thrown if the fiber is resumed outside the function set in Promise::onResolve() or if
+            // the fiber cannot be suspended.
+            throw new \Error('Exception unexpectedly thrown from Fiber::suspend()', 0, $e);
+        }
+
+        if (!$resolved) {
+            // $resolved should only be false if the function set in Promise::onResolve() did not resume the fiber.
+            throw new \Error('Fiber resumed before promise was resolved', 0, $e ?? null);
+        }
+    }
+
+    if ($error) {
+        throw $error;
+    }
+
+    return $value;
 }
 
 /**
@@ -86,76 +125,15 @@ function async(callable $callback, ...$args): Promise
 {
     $deferred = new Deferred;
 
-    try {
-        $fiber = new \Fiber($callback);
-
-        $awaited = $fiber->start(...$args);
-
-        if (!$awaited instanceof Internal\Suspension) {
-            if ($fiber->getStatus() !== \Fiber::STATUS_SUSPENDED) {
-                $deferred->resolve($fiber->getReturn());
-                return $deferred->promise();
-            }
-
-            throw new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises");
+    $fiber = new \Fiber(function () use ($deferred, $callback, $args): void {
+        try {
+            $deferred->resolve($callback(...$args));
+        } catch (\Throwable $e) {
+            $deferred->fail($e);
         }
+    });
 
-        /** @psalm-suppress MissingClosureParamType */
-        $onResolve = function (?\Throwable $exception, $value) use (&$onResolve, $fiber, $deferred): void {
-            static $thrown, $result, $immediate = true;
-
-            $thrown = $exception;
-            $result = $value;
-
-            if (!$immediate) {
-                $immediate = true;
-                return;
-            }
-
-            try {
-                try {
-                    do {
-                        if ($thrown) {
-                            // Throw exception at last await.
-                            $awaited = $fiber->throw($thrown);
-                        } else {
-                            // Send the new value and execute to next await.
-                            $awaited = $fiber->resume($result);
-                        }
-
-                        if (!$awaited instanceof Internal\Suspension) {
-                            if ($fiber->getStatus() !== \Fiber::STATUS_SUSPENDED) {
-                                $onResolve = null;
-                                $deferred->resolve($fiber->getReturn());
-                                return;
-                            }
-
-                            throw new InvalidAwaitError($awaited, "Use Amp\GreenThread\await() to await promises");
-                        }
-
-                        $immediate = false;
-                        $awaited->promise()->onResolve($onResolve);
-                    } while ($immediate);
-
-                    $immediate = true;
-                } catch (\Throwable $exception) {
-                    $deferred->fail($exception);
-                    $onResolve = null;
-                } finally {
-                    $thrown = null;
-                    $result = null;
-                }
-            } catch (\Throwable $exception) {
-                Loop::defer(static function () use ($exception) {
-                    throw $exception;
-                });
-            }
-        };
-
-        $awaited->promise()->onResolve($onResolve);
-    } catch (\Throwable $exception) {
-        $deferred->fail($exception);
-    }
+    $fiber->start();
 
     return $deferred->promise();
 }

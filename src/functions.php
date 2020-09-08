@@ -8,7 +8,21 @@ use Amp\Promise;
 use React\Promise\PromiseInterface as ReactPromise;
 
 /**
- * Await a promise within an async function created by Amp\GreenThread\async().
+ * Execute the given callback within a new green thread.
+ *
+ * @param callable $callback
+ * @param mixed    ...$args
+ */
+function execute(callable $callback, ...$args): void
+{
+    Loop::run(function () use ($callback, $args): Promise {
+        return async($callback, ...$args);
+    });
+}
+
+/**
+ * Await a promise within an async function created by Amp\GreenThread\async(). Can only be called within a
+ * green thread started with {@see execute()} or {@see async()}.
  *
  * @template TValue
  *
@@ -19,6 +33,8 @@ use React\Promise\PromiseInterface as ReactPromise;
  * @return mixed Promise resolution value.
  *
  * @psalm-return TValue|array<TValue>
+ *
+ * @throws InvalidAwaitError If the given parameter does not match one of the expected types.
  */
 function await($promise)
 {
@@ -153,29 +169,9 @@ function async(callable $callback, ...$args): Promise
  * @return callable(mixed ...$args):Promise Creates a new green thread each time the returned function is invoked. The arguments given to
  *    the returned function are passed through to the callable.
  */
-function continuation(callable $callback): callable
+function asyncCallable(callable $callback): callable
 {
     return function (...$args) use ($callback): Promise {
         return async($callback, ...$args);
-    };
-}
-
-/**
- * Returns a callable that when invoked creates a new green thread using the given callable using {@see async()} similar
- * to {@see coroutine()}, however unlike coroutine(), the promise is not returned, rather {@see Promise\rethrow()} is
- * called, forwarding any unhandled exceptions to the loop exception handler.
- *
- * Use this function to create a coroutine-aware callable for a non-promise-aware callback caller.
- *
- * @param callable(mixed ...$args):mixed $callback
- *
- * @return callable(mixed ...$args):void
- *
- * @see coroutine()
- */
-function asyncContinuation(callable $callback): callable
-{
-    return function (...$args) use ($callback): void {
-        Promise\rethrow(async($callback, ...$args));
     };
 }

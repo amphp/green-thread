@@ -2,7 +2,7 @@
 
 namespace Amp\GreenThread;
 
-class InvalidAwaitError extends \Error
+final class InvalidAwaitError extends \Error
 {
     /**
      * @param mixed $awaited

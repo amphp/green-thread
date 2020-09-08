@@ -3,9 +3,8 @@
 require \dirname(__DIR__) . "/vendor/autoload.php";
 
 use Amp\Delayed;
-use Amp\Loop;
 use function Amp\GreenThread\await;
-use function Amp\GreenThread\continuation;
+use function Amp\GreenThread\execute;
 
 // Any function can call await(), not only closures. Calling this function outside a green thread with throw an Error.
 function asyncTask(int $id): int
@@ -19,7 +18,7 @@ function asyncTask(int $id): int
     return $value;
 };
 
-Loop::run(continuation(function (): void {
+execute(function (): void {
     // Invoking $callback returns an int, but is executed asynchronously.
     $result = asyncTask(2); // Call a subroutine within this green thread, taking 1 second to return.
     \var_dump($result);
@@ -33,4 +32,4 @@ Loop::run(continuation(function (): void {
 
     $result = asyncTask(5); // Make another async subroutine call that will now throw from green thread.
     \var_dump($result);
-}));
+});

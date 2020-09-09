@@ -1,6 +1,6 @@
 <?php
 
-namespace Amp\GreenThread\Internal;
+namespace Amp\Internal;
 
 final class Future
 {
@@ -28,7 +28,7 @@ final class Future
         $this->exception = $exception;
         $this->value = $value;
 
-        if ($this->fiber->getStatus() == \Fiber::STATUS_SUSPENDED) {
+        if ($this->fiber->getStatus() === \Fiber::STATUS_SUSPENDED) {
             $this->fiber->resume();
         }
     }

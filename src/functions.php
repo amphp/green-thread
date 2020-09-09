@@ -1,24 +1,9 @@
 <?php
 
-namespace Amp\GreenThread;
+namespace Amp;
 
-use Amp\Deferred;
-use Amp\Loop;
-use Amp\Promise;
 use React\Promise\PromiseInterface as ReactPromise;
-
-/**
- * Execute the given callback within a new green thread.
- *
- * @param callable $callback
- * @param mixed    ...$args
- */
-function execute(callable $callback, ...$args): void
-{
-    Loop::run(function () use ($callback, $args): Promise {
-        return async($callback, ...$args);
-    });
-}
+use function Amp\Internal\createTypeError;
 
 /**
  * Await a promise within an async function created by Amp\GreenThread\async(). Can only be called within a
@@ -33,44 +18,21 @@ function execute(callable $callback, ...$args): void
  * @return mixed Promise resolution value.
  *
  * @psalm-return TValue|array<TValue>
- *
- * @throws InvalidAwaitError If the given parameter does not match one of the expected types.
  */
 function await($promise)
 {
-    while (!$promise instanceof Promise) {
-        try {
-            if (\is_array($promise)) {
-                $promise = Promise\all($promise);
-                break;
-            }
-
-            /** @psalm-suppress RedundantConditionGivenDocblockType */
-            if ($promise instanceof ReactPromise) {
-                $promise = Promise\adapt($promise);
-                break;
-            }
-
-            // No match, continue to throwing below.
-        } catch (\Throwable $exception) {
-            // Conversion to promise failed, fall-through to throwing below.
-        }
-
-        throw new InvalidAwaitError(
-            $promise,
-            \sprintf(
-                "Unexpected await; Expected an instance of %s or %s or an array of such instances",
-                Promise::class,
-                ReactPromise::class
-            ),
-            $exception ?? null
-        );
+    if (\is_array($promise)) {
+        $promise = Promise\all($promise);
+    } elseif ($promise instanceof ReactPromise) {
+        $promise = Promise\adapt($promise);
+    } elseif (!$promise instanceof Promise) {
+        throw createTypeError([Promise::class, ReactPromise::class], $promise);
     }
 
     $fiber = \Fiber::getCurrent();
 
     if ($fiber === null) {
-        throw new \Error('Cannot await outside a green thread; create a green thread using execute() or async() first');
+        return Promise\wait($promise);
     }
 
     $future = new Internal\Future($fiber);
@@ -96,15 +58,13 @@ function async(callable $callback, ...$args): Promise
 {
     $deferred = new Deferred;
 
-    $fiber = new \Fiber(function () use ($deferred, $callback, $args): void {
+    \Fiber::create(static function () use ($deferred, $callback, $args): void {
         try {
             $deferred->resolve($callback(...$args));
         } catch (\Throwable $e) {
             $deferred->fail($e);
         }
-    });
-
-    $fiber->start();
+    }, ...$args);
 
     return $deferred->promise();
 }
@@ -115,8 +75,8 @@ function async(callable $callback, ...$args): Promise
  *
  * @param callable $callback Green thread to create each time the function returned is invoked.
  *
- * @return callable(mixed ...$args):Promise Creates a new green thread each time the returned function is invoked. The arguments given to
- *    the returned function are passed through to the callable.
+ * @return callable(mixed ...$args):Promise Creates a new green thread each time the returned function is invoked. The
+ *     arguments given to the returned function are passed through to the callable.
  */
 function asyncCallable(callable $callback): callable
 {

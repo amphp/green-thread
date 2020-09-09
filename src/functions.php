@@ -73,40 +73,11 @@ function await($promise)
         throw new \Error('Cannot await outside a green thread; create a green thread using execute() or async() first');
     }
 
-    $resolved = false;
-    $error = null;
-    $value = null;
+    $future = new Internal\Future($fiber);
 
-    $promise->onResolve(function (?\Throwable $e, $v) use (&$resolved, &$error, &$value, $fiber): void {
-        $resolved = true;
-        $error = $e;
-        $value = $v;
+    $promise->onResolve($future);
 
-        if ($fiber->getStatus() == \Fiber::STATUS_SUSPENDED) {
-            $fiber->resume();
-        }
-    });
-
-    if (!$resolved) {
-        try {
-            \Fiber::suspend();
-        } catch (\Throwable $e) {
-            // An exception is thrown if the fiber is resumed outside the function set in Promise::onResolve() or if
-            // the fiber cannot be suspended.
-            throw new \Error('Exception unexpectedly thrown from Fiber::suspend()', 0, $e);
-        }
-
-        if (!$resolved) {
-            // $resolved should only be false if the function set in Promise::onResolve() did not resume the fiber.
-            throw new \Error('Fiber resumed before promise was resolved', 0, $e ?? null);
-        }
-    }
-
-    if ($error) {
-        throw $error;
-    }
-
-    return $value;
+    return $future->await();
 }
 
 /**

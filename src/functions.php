@@ -32,6 +32,10 @@ function await($promise)
     $fiber = \Fiber::getCurrent();
 
     if ($fiber === null) {
+        if (Loop::getInfo()['running']) {
+            throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
+        }
+
         return Promise\wait($promise);
     }
 
@@ -80,7 +84,7 @@ function async(callable $callback, ...$args): Promise
  */
 function asyncCallable(callable $callback): callable
 {
-    return function (...$args) use ($callback): Promise {
+    return static function (...$args) use ($callback): Promise {
         return async($callback, ...$args);
     };
 }

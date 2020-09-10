@@ -39,6 +39,10 @@ function await($promise)
         return Promise\wait($promise);
     }
 
+    if (!Loop::getInfo()['running']) {
+        return Promise\wait($promise);
+    }
+
     $future = new Internal\Future($fiber);
 
     $promise->onResolve($future);

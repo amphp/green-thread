@@ -88,13 +88,15 @@ function async(callable $callback, ...$args): Promise
 {
     $deferred = new Deferred;
 
-    \Fiber::run(static function () use ($deferred, $callback, $args): void {
-        try {
-            $deferred->resolve($callback(...$args));
-        } catch (\Throwable $e) {
-            $deferred->fail($e);
-        }
-    }, ...$args);
+    Loop::defer(static function () use ($deferred, $callback, $args): void {
+        \Fiber::run(static function () use ($deferred, $callback, $args): void {
+            try {
+                $deferred->resolve($callback(...$args));
+            } catch (\Throwable $e) {
+                $deferred->fail($e);
+            }
+        }, ...$args);
+    });
 
     return $deferred->promise();
 }

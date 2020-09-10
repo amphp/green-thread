@@ -2,16 +2,11 @@
 
 final class Fiber
 {
-    public const STATUS_SUSPENDED = 0;
-    public const STATUS_RUNNING = 1;
-    public const STATUS_FINISHED = 2;
-    public const STATUS_DEAD = 3;
-
     /**
      * @param callable $callback Function to invoke when starting the Fiber.
      * @param mixed ...$args Function arguments.
      */
-    public static function create(callable $callback, mixed ...$args): Fiber { }
+    public static function run(callable $callback, mixed ...$args): void { }
 
     /**
      * Private constructor to force use of {@see create()}.
@@ -19,9 +14,19 @@ final class Fiber
     private function __construct() { }
 
     /**
-     * @return int One of the Fiber status constants.
+     * @return bool True if the fiber is suspended.
      */
-    public function getStatus(): int { }
+    public function isSuspended(): bool { }
+
+    /**
+     * @return bool True if the fiber is currently running.
+     */
+    public function isRunning(): bool { }
+
+    /**
+     * @return bool True if the fiber has completed execution.
+     */
+    public function isTerminated(): bool { }
 
     /**
      * Resume execution of the fiber.
@@ -51,7 +56,10 @@ final class Fiber
 final class FiberError extends Error
 {
     /**
-     * Private constructor to prevent userland code from throwing FiberError.
+     * Private constructor to prevent user code from throwing FiberError.
      */
-    private function __construct(string $message) { }
+    public function __construct(string $message)
+    {
+        throw new \Error("FiberError cannot be constructed manually");
+    }
 }

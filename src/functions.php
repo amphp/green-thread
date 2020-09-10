@@ -26,7 +26,7 @@ function await($promise)
     } elseif ($promise instanceof ReactPromise) {
         $promise = Promise\adapt($promise);
     } elseif (!$promise instanceof Promise) {
-        throw createTypeError([Promise::class, ReactPromise::class], $promise);
+        throw createTypeError([Promise::class, ReactPromise::class, 'array'], $promise);
     }
 
     $fiber = \Fiber::getCurrent();
@@ -36,7 +36,9 @@ function await($promise)
             throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
         }
 
-        return Promise\wait($promise);
+        return Promise\wait(async(function () use ($promise) {
+            return await($promise);
+        }));
     }
 
     if (!Loop::getInfo()['running']) {
@@ -57,7 +59,7 @@ function await($promise)
  * Exceptions that cannot be handled are exceptions thrown from an error handler or exceptions that would be passed to
  * an error handler but none exists to handle them.
  */
-function awaitIdle(): void
+function awaitPending(): void
 {
     $fiber = \Fiber::getCurrent();
 

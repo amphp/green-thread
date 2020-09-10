@@ -7,6 +7,6 @@ use function Amp\delay;
 
 \Fiber::run(function () {
     print 'before';
-    await(delay(10));
+    await(delay(1000));
     print 'after';
 });

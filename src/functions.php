@@ -61,12 +61,6 @@ function await($promise)
  */
 function awaitPending(): void
 {
-    $fiber = \Fiber::getCurrent();
-
-    if ($fiber !== null) {
-        throw new \Error(__FUNCTION__ . " may only be called from the root context, not from within a fiber.");
-    }
-
     if (Loop::getInfo()['running']) {
         throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
     }

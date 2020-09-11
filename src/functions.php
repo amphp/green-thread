@@ -29,9 +29,7 @@ function await($promise)
         throw createTypeError([Promise::class, ReactPromise::class, 'array'], $promise);
     }
 
-    $fiber = \Fiber::getCurrent();
-
-    if ($fiber === null) {
+    if (!\Fiber::inFiber()) {
         if (Loop::getInfo()['running']) {
             throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
         }
@@ -45,11 +43,7 @@ function await($promise)
         return Promise\wait($promise);
     }
 
-    $future = new Internal\Future($fiber);
-
-    $promise->onResolve($future);
-
-    return $future->await();
+    return \Fiber::await(new Internal\Future($promise));
 }
 
 /**
@@ -61,9 +55,7 @@ function await($promise)
  */
 function awaitPending(): void
 {
-    $fiber = \Fiber::getCurrent();
-
-    if ($fiber !== null) {
+    if (\Fiber::inFiber()) {
         throw new \Error(__FUNCTION__ . " may only be called from the root context, not from within a fiber.");
     }
 
@@ -91,13 +83,16 @@ function async(callable $callback, ...$args): Promise
     $deferred = new Deferred;
 
     Loop::defer(static function () use ($deferred, $callback, $args): void {
-        \Fiber::run(static function () use ($deferred, $callback, $args): void {
-            try {
-                $deferred->resolve($callback(...$args));
-            } catch (\Throwable $e) {
-                $deferred->fail($e);
+        $awaitable = \Fiber::run($callback, ...$args);
+
+        $awaitable->when(function (?\Throwable $exception, $value) use ($deferred): void {
+            if ($exception) {
+                $deferred->fail($exception);
+                return;
             }
-        }, ...$args);
+
+            $deferred->resolve($value);
+        });
     });
 
     return $deferred->promise();

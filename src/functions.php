@@ -17,6 +17,8 @@ use function Amp\Internal\createTypeError;
  *
  * @return mixed Promise resolution value.
  *
+ * @throws \Throwable Promise failure reason.
+ *
  * @psalm-return TValue|array<TValue>
  */
 function await($promise)
@@ -29,9 +31,7 @@ function await($promise)
         throw createTypeError([Promise::class, ReactPromise::class, 'array'], $promise);
     }
 
-    $fiber = \Fiber::getCurrent();
-
-    if ($fiber === null) {
+    if (!\Fiber::inFiber()) {
         if (Loop::getInfo()['running']) {
             throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
         }
@@ -45,11 +45,7 @@ function await($promise)
         return Promise\wait($promise);
     }
 
-    $future = new Internal\Future($fiber);
-
-    $promise->onResolve($future);
-
-    return $future->await();
+    return \Fiber::suspend(new Internal\Future($promise));
 }
 
 /**
@@ -61,9 +57,7 @@ function await($promise)
  */
 function awaitPending(): void
 {
-    $fiber = \Fiber::getCurrent();
-
-    if ($fiber !== null) {
+    if (\Fiber::inFiber()) {
         throw new \Error(__FUNCTION__ . " may only be called from the root context, not from within a fiber.");
     }
 

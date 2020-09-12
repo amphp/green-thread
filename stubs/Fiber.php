@@ -9,7 +9,7 @@ final class Fiber
     public static function run(callable $callback, mixed ...$args): void { }
 
     /**
-     * Private constructor to force use of {@see create()}.
+     * Private constructor to force use of {@see run()}.
      */
     private function __construct() { }
 
@@ -29,37 +29,36 @@ final class Fiber
     public function isTerminated(): bool { }
 
     /**
-     * Resume execution of the fiber.
+     * Resume execution of the fiber, returning the given value from {@see Fiber::suspend()}.
+     *
+     * @param mixed $value
      *
      * @throws FiberError Thrown if the fiber has finished or is currently running.
      */
-    public function resume(): void { }
+    public function resume(mixed $value): void { }
+
+    /**
+     * Throw an exception from {@see Fiber::suspend()}.
+     *
+     * @param Throwable $exception
+     *
+     * @throws FiberError Thrown if the fiber has finished or is currently running.
+     */
+    public function throw(\Throwable $exception): void { }
 
     /**
      * Suspend execution of the fiber.
      *
-     * @throws FiberError Thrown if not within a fiber.
-     */
-    public static function suspend(): void { }
-
-    /**
-     * Returns the current Fiber context or null if not within a fiber.
+     * @param Future $future
      *
-     * @return Fiber|null
+     * @return mixed Value given to {@see Fiber::resume()}.
+     *
+     * @throws FiberError Thrown if not within a fiber context.
      */
-    public static function getCurrent(): ?Fiber { }
-}
+    public static function suspend(Future $future): mixed { }
 
-/**
- * Exception thrown due to invalid fiber actions, such as suspending from outside a fiber.
- */
-final class FiberError extends Error
-{
     /**
-     * Private constructor to prevent user code from throwing FiberError.
+     * @return bool True if currently executing within a fiber context, false if in root context.
      */
-    public function __construct(string $message)
-    {
-        throw new \Error("FiberError cannot be constructed manually");
-    }
+    public static function inFiber(): bool { }
 }

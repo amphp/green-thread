@@ -31,20 +31,6 @@ function await($promise)
         throw createTypeError([Promise::class, ReactPromise::class, 'array'], $promise);
     }
 
-    if (!\Fiber::inFiber()) {
-        if (Loop::getInfo()['running']) {
-            throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
-        }
-
-        return Promise\wait(async(function () use ($promise) {
-            return await($promise);
-        }));
-    }
-
-    if (!Loop::getInfo()['running']) {
-        return Promise\wait($promise);
-    }
-
     return \Fiber::suspend(new Internal\Future($promise));
 }
 

@@ -37,6 +37,10 @@ final class Future implements \Future
 
 (static function (): void {
     self::$scheduler = \Scheduler::create(static function (): void {
-        Loop::run();
+        do {
+            Loop::run();
+            \Scheduler::pause();
+        } while (Loop::getInfo()['enabled_watchers']['referenced']);
+        throw new \Error('Should not be reached');
     });
 })->bindTo(null, Future::class)();

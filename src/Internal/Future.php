@@ -2,7 +2,6 @@
 
 namespace Amp\Internal;
 
-use Amp\Loop;
 use Amp\Promise;
 
 final class Future implements \Future
@@ -36,11 +35,5 @@ final class Future implements \Future
 }
 
 (static function (): void {
-    self::$scheduler = \Scheduler::create(static function (): void {
-        do {
-            Loop::run();
-            \Scheduler::pause();
-        } while (Loop::getInfo()['enabled_watchers']['referenced']);
-        throw new \Error('Should not be reached');
-    });
+    self::$scheduler = new Scheduler;
 })->bindTo(null, Future::class)();

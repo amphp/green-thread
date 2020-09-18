@@ -6,6 +6,14 @@ use Amp\Delayed;
 use Amp\Loop;
 use Amp\Promise;
 
+class Manager implements Scheduler
+{
+    public function run(): void
+    {
+        Loop::run();
+    }
+}
+
 class Continuation implements Future
 {
     private $promise;
@@ -16,10 +24,7 @@ class Continuation implements Future
         $this->promise = $promise;
 
         if (self::$scheduler === null) {
-            self::$scheduler = Scheduler::create(function (): void {
-                Loop::run();
-                throw new \Error('This should never be reached');
-            });
+            self::$scheduler = new Manager;
         }
     }
 
@@ -44,8 +49,8 @@ $fiber = Fiber::run(function (): void {
 
     var_dump(Fiber::suspend(new Continuation($promise1)));
     var_dump(Fiber::suspend(new Continuation($promise2)));
-
-    $promise3 = new Delayed(1000, 3);
-
-    var_dump(Fiber::suspend(new Continuation($promise3)));
+//
+//    $promise3 = new Delayed(1000, 3);
+//
+//    var_dump(Fiber::suspend(new Continuation($promise3)));
 });

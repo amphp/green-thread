@@ -18,7 +18,7 @@
         }
     ],
     "require": {
-        "php": ">=7.1",
+        "php": ">=8",
         "ext-fiber": "*",
         "amphp/amp": "^2.5"
     },

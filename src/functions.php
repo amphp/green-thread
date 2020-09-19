@@ -3,7 +3,6 @@
 namespace Amp;
 
 use React\Promise\PromiseInterface as ReactPromise;
-use function Amp\Internal\createTypeError;
 
 /**
  * Await a promise within an async function created by Amp\GreenThread\async(). Can only be called within a
@@ -21,14 +20,14 @@ use function Amp\Internal\createTypeError;
  *
  * @psalm-return TValue|array<TValue>
  */
-function await($promise)
+function await(Promise|ReactPromise|array $promise): mixed
 {
-    if (\is_array($promise)) {
-        $promise = Promise\all($promise);
-    } elseif ($promise instanceof ReactPromise) {
-        $promise = Promise\adapt($promise);
-    } elseif (!$promise instanceof Promise) {
-        throw createTypeError([Promise::class, ReactPromise::class, 'array'], $promise);
+    if (!$promise instanceof Promise) {
+        if (\is_array($promise)) {
+            $promise = Promise\all($promise);
+        } elseif ($promise instanceof ReactPromise) {
+            $promise = Promise\adapt($promise);
+        }
     }
 
     return \Fiber::suspend(new Internal\Future($promise));
@@ -46,7 +45,7 @@ function await($promise)
  *
  * @psalm-return Promise<TValue>
  */
-function async(callable $callback, ...$args): Promise
+function async(callable $callback, mixed ...$args): Promise
 {
     $deferred = new Deferred;
 

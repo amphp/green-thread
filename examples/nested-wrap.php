@@ -9,8 +9,8 @@ use function Amp\delay;
 
 Loop::defer(asyncCallable(function () {
     await(delay(100));
-    print 'inner';
+    echo 'inner', PHP_EOL;
 }));
 
 await(delay(10));
-print 'outer';
+echo 'outer', PHP_EOL;

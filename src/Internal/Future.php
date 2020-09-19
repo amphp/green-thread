@@ -2,15 +2,14 @@
 
 namespace Amp\Internal;
 
+use Amp\Loop;
 use Amp\Promise;
 
 final class Future implements \Future
 {
-    /** @var \Scheduler */
-    private static $scheduler;
+    private static Scheduler $scheduler;
 
-    /** @var Promise */
-    private $promise;
+    private Promise $promise;
 
     public function __construct(Promise $promise)
     {
@@ -20,20 +19,16 @@ final class Future implements \Future
     public function schedule(\Fiber $fiber): \Scheduler
     {
         $this->promise->onResolve(function (?\Throwable $exception, $value) use ($fiber): void {
-            \assert($fiber->isSuspended(), "Fiber resumed outside of future!");
-
             if ($exception) {
-                $fiber->throw($exception);
+                Loop::defer(fn () => $fiber->throw($exception));
                 return;
             }
 
-            $fiber->resume($value);
+            Loop::defer(fn () => $fiber->resume($value));
         });
 
         return self::$scheduler;
     }
 }
 
-(static function (): void {
-    self::$scheduler = new Scheduler;
-})->bindTo(null, Future::class)();
+(static fn () => self::$scheduler = new Scheduler)->bindTo(null, Future::class)();

@@ -3,7 +3,6 @@
 namespace Amp;
 
 use React\Promise\PromiseInterface as ReactPromise;
-use function Amp\Internal\createTypeError;
 
 /**
  * Await a promise within an async function created by Amp\GreenThread\async(). Can only be called within a
@@ -17,55 +16,21 @@ use function Amp\Internal\createTypeError;
  *
  * @return mixed Promise resolution value.
  *
+ * @throws \Throwable Promise failure reason.
+ *
  * @psalm-return TValue|array<TValue>
  */
-function await($promise)
+function await(Promise|ReactPromise|array $promise): mixed
 {
-    if (\is_array($promise)) {
-        $promise = Promise\all($promise);
-    } elseif ($promise instanceof ReactPromise) {
-        $promise = Promise\adapt($promise);
-    } elseif (!$promise instanceof Promise) {
-        throw createTypeError([Promise::class, ReactPromise::class, 'array'], $promise);
-    }
-
-    $fiber = \Fiber::getCurrent();
-
-    if ($fiber === null) {
-        if (Loop::getInfo()['running']) {
-            throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
+    if (!$promise instanceof Promise) {
+        if (\is_array($promise)) {
+            $promise = Promise\all($promise);
+        } elseif ($promise instanceof ReactPromise) {
+            $promise = Promise\adapt($promise);
         }
-
-        return Promise\wait(async(function () use ($promise) {
-            return await($promise);
-        }));
     }
 
-    if (!Loop::getInfo()['running']) {
-        return Promise\wait($promise);
-    }
-
-    $future = new Internal\Future($fiber);
-
-    $promise->onResolve($future);
-
-    return $future->await();
-}
-
-/**
- * Run the event loop until it is either stopped explicitly, no referenced watchers exist anymore, or an
- * exception is thrown that cannot be handled.
- *
- * Exceptions that cannot be handled are exceptions thrown from an error handler or exceptions that would be passed to
- * an error handler but none exists to handle them.
- */
-function awaitPending(): void
-{
-    if (Loop::getInfo()['running']) {
-        throw new \Error(__FUNCTION__ . " can't be used inside event loop callbacks. Tip: Wrap your callback with asyncCallable.");
-    }
-
-    Loop::run();
+    return \Fiber::suspend(new Internal\Future($promise));
 }
 
 /**
@@ -80,7 +45,7 @@ function awaitPending(): void
  *
  * @psalm-return Promise<TValue>
  */
-function async(callable $callback, ...$args): Promise
+function async(callable $callback, mixed ...$args): Promise
 {
     $deferred = new Deferred;
 

@@ -4,7 +4,7 @@ namespace Amp\Internal;
 
 use Amp\Loop;
 
-final class Scheduler implements \Scheduler
+final class Scheduler implements \FiberScheduler
 {
     /** @var self */
     private static self $instance;

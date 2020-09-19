@@ -14,7 +14,7 @@ final class Future implements \Future
         $this->promise = $promise;
     }
 
-    public function schedule(\Fiber $fiber): \Scheduler
+    public function schedule(\Fiber $fiber): \FiberScheduler
     {
         $this->promise->onResolve(function (?\Throwable $exception, $value) use ($fiber): void {
             if ($exception) {

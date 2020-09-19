@@ -7,8 +7,6 @@ use Amp\Promise;
 
 final class Future implements \Future
 {
-    private static Scheduler $scheduler;
-
     private Promise $promise;
 
     public function __construct(Promise $promise)
@@ -20,15 +18,12 @@ final class Future implements \Future
     {
         $this->promise->onResolve(function (?\Throwable $exception, $value) use ($fiber): void {
             if ($exception) {
-                Loop::defer(fn () => $fiber->throw($exception));
-                return;
+                Loop::defer(static fn () => $fiber->throw($exception));
+            } else {
+                Loop::defer(static fn () => $fiber->resume($value));
             }
-
-            Loop::defer(fn () => $fiber->resume($value));
         });
 
-        return self::$scheduler;
+        return Scheduler::get();
     }
 }
-
-(static fn () => self::$scheduler = new Scheduler)->bindTo(null, Future::class)();

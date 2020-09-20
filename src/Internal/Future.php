@@ -16,6 +16,8 @@ final class Future implements \Awaitable
 
     public function onResolve(callable $onResolve): void
     {
-        $this->promise->onResolve(fn (?\Throwable $e, mixed $v) => Loop::defer(fn () => $onResolve($e, $v)));
+        $this->promise->onResolve(
+            static fn (?\Throwable $e, mixed $v) => Loop::defer(static fn () => $onResolve($e, $v))
+        );
     }
 }

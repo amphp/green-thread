@@ -73,5 +73,5 @@ function async(callable $callback, mixed ...$args): Promise
  */
 function asyncCallable(callable $callback): callable
 {
-    return fn (mixed ...$args): Promise => async($callback, ...$args);
+    return static fn (mixed ...$args): Promise => async($callback, ...$args);
 }

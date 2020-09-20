@@ -5,8 +5,8 @@ namespace Amp;
 use React\Promise\PromiseInterface as ReactPromise;
 
 /**
- * Await a promise within an async function created by Amp\GreenThread\async(). Can only be called within a
- * green thread started with {@see execute()} or {@see async()}.
+ * Await the resolution of the given promise. The function does not return until the promise has been
+ * resolved. The promise resolution value is returned or the promise failure reason is thrown.
  *
  * @template TValue
  *
@@ -30,7 +30,7 @@ function await(Promise|ReactPromise|array $promise): mixed
         }
     }
 
-    return \Fiber::suspend(new Internal\Future($promise));
+    return \Fiber::await(new Internal\Future($promise), Internal\Scheduler::get());
 }
 
 /**
@@ -73,7 +73,5 @@ function async(callable $callback, mixed ...$args): Promise
  */
 function asyncCallable(callable $callback): callable
 {
-    return static function (...$args) use ($callback): Promise {
-        return async($callback, ...$args);
-    };
+    return fn (mixed ...$args): Promise => async($callback, ...$args);
 }

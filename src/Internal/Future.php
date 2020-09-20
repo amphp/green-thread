@@ -5,7 +5,7 @@ namespace Amp\Internal;
 use Amp\Loop;
 use Amp\Promise;
 
-final class Future implements \Future
+final class Future implements \Awaitable
 {
     private Promise $promise;
 
@@ -14,16 +14,8 @@ final class Future implements \Future
         $this->promise = $promise;
     }
 
-    public function schedule(\Fiber $fiber): \FiberScheduler
+    public function onResolve(callable $onResolve): void
     {
-        $this->promise->onResolve(function (?\Throwable $exception, $value) use ($fiber): void {
-            if ($exception) {
-                Loop::defer(static fn () => $fiber->throw($exception));
-            } else {
-                Loop::defer(static fn () => $fiber->resume($value));
-            }
-        });
-
-        return Scheduler::get();
+        $this->promise->onResolve(fn (?\Throwable $e, mixed $v) => Loop::defer(fn () => $onResolve($e, $v)));
     }
 }
